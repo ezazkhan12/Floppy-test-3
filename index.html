@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Flappy Friends</title>
+<style>
+  :root { --bg:#70c5ce; --card:#fff; --ink:#222; --accent:#ff7a29; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { margin:0; height:100%; background:var(--bg); font-family:system-ui,sans-serif; color:var(--ink); overflow:hidden; }
+  .screen { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; padding:16px; }
+  .hidden { display:none !important; }
+  .card { background:var(--card); border-radius:20px; padding:24px; width:100%; max-width:360px; text-align:center; box-shadow:0 10px 30px rgba(0,0,0,.2); max-height:100%; overflow:auto; }
+  .card h1 { margin:0 0 6px; font-size:1.6rem; }
+  .card h3 { margin:14px 0 4px; font-size:1rem; }
+  .card p { margin:0 0 12px; opacity:.7; }
+  input { width:100%; padding:14px; font-size:1.1rem; border:2px solid #ddd; border-radius:12px; margin-bottom:12px; text-align:center; }
+  button { width:100%; padding:14px; font-size:1.1rem; font-weight:700; border:0; border-radius:12px; background:var(--accent); color:#fff; cursor:pointer; }
+  .error { color:#d33; min-height:1.2em; margin:-4px 0 8px; font-size:.9rem; }
+  .avatar { width:96px; height:96px; border-radius:50%; object-fit:cover; object-position:center; border:4px solid var(--accent); background:#eee; display:block; margin:0 auto 10px; }
+
+  /* Leaderboard: grows with any number of players, scrolls if long */
+  .board { list-style:none; margin:0 0 14px; padding:0; max-height:200px; overflow:auto; text-align:left; }
+  .board li { display:flex; align-items:center; gap:10px; padding:6px 4px; border-bottom:1px solid #eee; }
+  .board li.me { background:#fff3e8; border-radius:8px; }
+  .board img { width:30px; height:30px; border-radius:50%; object-fit:cover; background:#eee; }
+  .board .n { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .board .s { font-weight:700; }
+
+  #gameWrap { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; }
+  canvas { height:100%; max-width:100%; aspect-ratio:2/3; background:var(--bg); touch-action:none; }
+  #hud { position:fixed; top:10px; left:10px; right:10px; display:flex; align-items:center; gap:10px; pointer-events:none; color:#fff; text-shadow:0 2px 4px rgba(0,0,0,.5); font-weight:700; }
+  #hud img { width:36px; height:36px; border-radius:50%; object-fit:cover; border:2px solid #fff; }
+  #hud .score { margin-left:auto; font-size:1.6rem; }
+</style>
+</head>
+<body>
+
+<div id="login" class="screen">
+  <div class="card">
+    <h1>🐤 Flappy Friends</h1>
+    <p>Enter your phone number to play</p>
+    <input id="phone" type="tel" inputmode="numeric" placeholder="Phone number" autocomplete="off">
+    <div id="err" class="error"></div>
+    <button id="enter">Enter</button>
+  </div>
+</div>
+
+<div id="welcome" class="screen hidden">
+  <div class="card">
+    <img id="wAvatar" class="avatar" alt="">
+    <h1 id="wName"></h1>
+    <p>Your best score: <b id="wBest">0</b></p>
+    <h3>🏆 Leaderboard</h3>
+    <ol id="board" class="board"></ol>
+    <button id="play">Play</button>
+  </div>
+</div>
+
+<div id="gameWrap" class="hidden">
+  <canvas id="c" width="400" height="600"></canvas>
+</div>
+<div id="hud" class="hidden">
+  <img id="hAvatar" alt=""><span id="hName"></span><span class="score" id="hScore">0</span>
+</div>
+
+<script>
+/* ============================================================
+   FIREBASE  –  paste your Realtime Database URL between the quotes
+   (looks like https://yourproject-default-rtdb.firebaseio.com)
+   No trailing slash. If left as is, scores stay on the device only.
+   ============================================================ */
+const DB_URL = "https://floppy-test-1066d-default-rtdb.asia-southeast1.firebasedatabase.app";
+
+/* ============================================================
+   PLAYERS  –  EDIT HERE
+   To add a player, COPY one line and paste it under the last one.
+   ============================================================ */
+const PLAYERS = [
+  { phone: "9101188370", name: "Ezaz Khan",     image: "ezaz.jpg" },
+  { phone: "8977227974", name: "Baburao",       image: "babu.jpg" },
+  { phone: "7766054126", name: "Gulam",         image: "gulam.jpg" },
+  { phone: "9065789937", name: "Sahil_bihari",  image: "sahil.jpg" },
+  { phone: "0000000005", name: "USERNAME_5",    image: "images/player5.jpg" },
+  // { phone: "0000000006", name: "USERNAME_6", image: "images/player6.jpg" },
+];
+/* ============================================================ */
+
+const $ = id => document.getElementById(id);
+const digits = s => s.replace(/\D/g, "");
+const keyOf = p => digits(p.phone).slice(-10);   // database key = last 10 digits
+const ONLINE = DB_URL.startsWith("http");
+let player = null, birdImg = null, best = 0;
+
+function findPlayer(input) {
+  const d = digits(input);
+  if (!d) return null;
+  return PLAYERS.find(p => {
+    const pd = digits(p.phone);
+    return pd === d || (d.length >= 10 && pd.slice(-10) === d.slice(-10));
+  }) || null;
+}
+
+/* ---------- storage: device + Firebase ---------- */
+const localKey = () => "flappy_best_" + keyOf(player);
+const getLocal = () => +localStorage.getItem(localKey()) || 0;
+
+async function getScores() {
+  if (!ONLINE) return {};
+  try { const r = await fetch(DB_URL + "/scores.json"); return (await r.json()) || {}; }
+  catch (e) { return {}; }
+}
+async function saveRemote() {
+  if (!ONLINE) return;
+  try {
+    await fetch(DB_URL + "/scores/" + keyOf(player) + ".json", {
+      method: "PUT",
+      body: JSON.stringify({ name: player.name, best })
+    });
+  } catch (e) { /* offline: local score is still saved */ }
+}
+
+async function renderBoard() {
+  const scores = await getScores();
+  const myKey = keyOf(player);
+  const rows = PLAYERS.map(p => ({ p, s: (scores[keyOf(p)] && scores[keyOf(p)].best) || 0 }));
+  const mine = rows.find(r => keyOf(r.p) === myKey);
+  if (mine) mine.s = Math.max(mine.s, best);
+  rows.sort((a, b) => b.s - a.s);
+  const ol = $("board"); ol.innerHTML = "";
+  rows.forEach((r, i) => {
+    const li = document.createElement("li");
+    if (keyOf(r.p) === myKey) li.className = "me";
+    const rank = document.createElement("span"); rank.textContent = (i + 1) + ".";
+    const img = document.createElement("img"); img.src = r.p.image; img.alt = "";
+    const n = document.createElement("span"); n.className = "n"; n.textContent = r.p.name;
+    const s = document.createElement("span"); s.className = "s"; s.textContent = r.s;
+    li.append(rank, img, n, s);
+    ol.appendChild(li);
+  });
+}
+
+async function login() {
+  const p = findPlayer($("phone").value);
+  if (!p) { $("err").textContent = "This number isn't allowed to play."; return; }
+  player = p;
+  $("err").textContent = "";
+  birdImg = new Image(); birdImg.src = p.image;
+  [$("wAvatar"), $("hAvatar")].forEach(i => i.src = p.image);
+  $("wName").textContent = $("hName").textContent = p.name;
+  best = getLocal();
+  $("wBest").textContent = best;
+  $("login").classList.add("hidden");
+  $("welcome").classList.remove("hidden");
+  renderBoard();
+  // pull the saved best from the server (works across devices)
+  const scores = await getScores();
+  const remote = (scores[keyOf(p)] && scores[keyOf(p)].best) || 0;
+  if (remote > best) { best = remote; localStorage.setItem(localKey(), best); }
+  else if (best > remote) saveRemote();
+  $("wBest").textContent = best;
+  renderBoard();
+}
+$("enter").onclick = login;
+$("phone").addEventListener("keydown", e => e.key === "Enter" && login());
+$("play").onclick = () => {
+  $("welcome").classList.add("hidden");
+  $("gameWrap").classList.remove("hidden");
+  $("hud").classList.remove("hidden");
+  reset();
+  requestAnimationFrame(loop);
+};
+
+/* ---------------- GAME ---------------- */
+const cv = $("c"), ctx = cv.getContext("2d");
+const W = 400, H = 600, R = 22, GAP = 160, PIPE_W = 64, SPEED = 2.6, GROUND = 40;
+let bird, pipes, score, state, frame, last, overAt = 0, looping = false;
+
+function reset() {
+  bird = { x: 100, y: H / 2, v: 0 };
+  pipes = []; score = 0; frame = 0; state = "ready"; last = 0;
+  $("hScore").textContent = 0;
+}
+function flap() {
+  if (state === "ready") state = "play";
+  if (state === "play") bird.v = -7.6;
+  else if (state === "over" && Date.now() - overAt > 500) reset();
+}
+function die() {
+  state = "over"; overAt = Date.now();
+  if (score > best) {
+    best = score;
+    localStorage.setItem(localKey(), best);
+    saveRemote();
+  }
+}
+
+addEventListener("keydown", e => { if (e.code === "Space" || e.key === "ArrowUp") { e.preventDefault(); flap(); } });
+cv.addEventListener("pointerdown", e => { e.preventDefault(); flap(); });
+
+function update(dt) {
+  if (state !== "play") return;
+  frame += dt;
+  bird.v += 0.46 * dt;
+  bird.y += bird.v * dt;
+  if (!pipes.length || W - pipes[pipes.length - 1].x >= 220) {
+    const top = 60 + Math.random() * (H - GROUND - GAP - 120);
+    pipes.push({ x: W, top, passed: false });
+  }
+  pipes.forEach(p => {
+    p.x -= SPEED * dt;
+    if (!p.passed && p.x + PIPE_W < bird.x) { p.passed = true; score++; $("hScore").textContent = score; }
+    const hitX = bird.x + R * .8 > p.x && bird.x - R * .8 < p.x + PIPE_W;
+    if (hitX && (bird.y - R * .8 < p.top || bird.y + R * .8 > p.top + GAP)) die();
+  });
+  pipes = pipes.filter(p => p.x > -PIPE_W);
+  if (bird.y + R > H - GROUND || bird.y - R < 0) die();
+}
+
+function drawBird() {
+  ctx.save();
+  ctx.translate(bird.x, bird.y);
+  ctx.rotate(Math.max(-0.5, Math.min(1.0, bird.v / 12)));
+  ctx.beginPath(); ctx.arc(0, 0, R, 0, Math.PI * 2); ctx.clip();
+  if (birdImg && birdImg.complete && birdImg.naturalWidth) {
+    const s = Math.min(birdImg.naturalWidth, birdImg.naturalHeight);
+    const sx = (birdImg.naturalWidth - s) / 2, sy = (birdImg.naturalHeight - s) / 2;
+    ctx.drawImage(birdImg, sx, sy, s, s, -R, -R, R * 2, R * 2);
+  } else {
+    ctx.fillStyle = "#ffcf33"; ctx.fillRect(-R, -R, R * 2, R * 2);
+    ctx.fillStyle = "#333"; ctx.font = "bold 22px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText((player.name[0] || "?").toUpperCase(), 0, 1);
+  }
+  ctx.restore();
+  ctx.beginPath(); ctx.arc(bird.x, bird.y, R, 0, Math.PI * 2);
+  ctx.lineWidth = 3; ctx.strokeStyle = "#fff"; ctx.stroke();
+}
+
+function draw() {
+  ctx.fillStyle = "#70c5ce"; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = "#4caf50";
+  pipes.forEach(p => {
+    ctx.fillRect(p.x, 0, PIPE_W, p.top);
+    ctx.fillRect(p.x, p.top + GAP, PIPE_W, H);
+    ctx.fillStyle = "#388e3c";
+    ctx.fillRect(p.x - 4, p.top - 22, PIPE_W + 8, 22);
+    ctx.fillRect(p.x - 4, p.top + GAP, PIPE_W + 8, 22);
+    ctx.fillStyle = "#4caf50";
+  });
+  ctx.fillStyle = "#ded895"; ctx.fillRect(0, H - GROUND, W, GROUND);
+  ctx.fillStyle = "#8bc34a"; ctx.fillRect(0, H - GROUND, W, 6);
+  drawBird();
+  ctx.textAlign = "center"; ctx.fillStyle = "#fff"; ctx.strokeStyle = "rgba(0,0,0,.5)"; ctx.lineWidth = 4;
+  const say = (t, y, size) => { ctx.font = `bold ${size}px sans-serif`; ctx.strokeText(t, W / 2, y); ctx.fillText(t, W / 2, y); };
+  if (state === "ready") say("Tap to start", 220, 32);
+  if (state === "over") {
+    say("Game Over", 200, 42);
+    say("Score " + score + "  ·  Best " + best, 250, 26);
+    say("Tap to retry", 300, 24);
+  }
+}
+
+function loop(t) {
+  const dt = Math.min((t - (last || t)) / 16.67, 2);
+  last = t;
+  update(dt); draw();
+  requestAnimationFrame(loop);
+}
+</script>
+</body>
+</html>
