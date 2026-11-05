@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Game🎮 Wizard 🪄</title>
+
+<style>
+  /* ============ THEME ============ */
+  :root {
+    --bg:        #0e0b1a;
+    --bg-soft:   #171327;
+    --card:      #1d1832;
+    --card-hi:   #251f40;
+    --text:      #f2f0ff;
+    --muted:     #a49dc4;
+    --accent:    #8b5cf6;
+    --accent-2:  #ec4899;
+    --radius:    18px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    background-image:
+      radial-gradient(circle at 15% 0%, rgba(139,92,246,.25), transparent 45%),
+      radial-gradient(circle at 85% 10%, rgba(236,72,153,.20), transparent 45%);
+    background-attachment: fixed;
+  }
+
+  /* ============ HEADER ============ */
+  header {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    backdrop-filter: blur(14px);
+    background: rgba(14, 11, 26, .75);
+    border-bottom: 1px solid rgba(255,255,255,.07);
+  }
+
+  .header-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 14px 22px;
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    flex-wrap: wrap;
+  }
+
+  .logo {
+    font-size: 1.35rem;
+    font-weight: 800;
+    letter-spacing: .5px;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    white-space: nowrap;
+  }
+
+  .logo span {
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .search-wrap {
+    flex: 1;
+    min-width: 200px;
+    position: relative;
+    max-width: 420px;
+    margin-left: auto;
+  }
+
+  .search-wrap input {
+    width: 100%;
+    padding: 11px 16px 11px 42px;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,.1);
+    background: var(--bg-soft);
+    color: var(--text);
+    font-size: .95rem;
+    outline: none;
+    transition: border-color .2s, box-shadow .2s;
+  }
+
+  .search-wrap input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 4px rgba(139,92,246,.18);
+  }
+
+  .search-wrap::before {
+    content: "🔍";
+    position: absolute;
+    left: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: .85rem;
+    opacity: .7;
+  }
+
+  /* ============ HERO ============ */
+  .hero {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 48px 22px 10px;
+    text-align: center;
+  }
+
+  .hero h1 {
+    font-size: clamp(1.9rem, 5vw, 3rem);
+    font-weight: 900;
+    line-height: 1.15;
+    letter-spacing: -1px;
+  }
+
+  .hero h1 em {
+    font-style: normal;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .hero p {
+    margin-top: 12px;
+    color: var(--muted);
+    font-size: 1rem;
+  }
+
+  /* ============ GAME GRID ============ */
+  .grid {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 34px 22px 60px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(215px, 1fr));
+    gap: 20px;
+  }
+
+  .card {
+    position: relative;
+    display: block;
+    text-decoration: none;
+    color: inherit;
+    background: var(--card);
+    border: 1px solid rgba(255,255,255,.07);
+    border-radius: var(--radius);
+    overflow: hidden;
+    transition: transform .22s ease, border-color .22s, box-shadow .22s;
+  }
+
+  .card:hover {
+    transform: translateY(-6px) scale(1.015);
+    border-color: rgba(139,92,246,.6);
+    box-shadow: 0 18px 40px -12px rgba(139,92,246,.55);
+  }
+    /* Thumbnail area */
+  .thumb {
+    aspect-ratio: 16 / 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 3.4rem;
+    background: linear-gradient(135deg,
+        hsl(var(--h) 70% 42%),
+        hsl(calc(var(--h) + 55) 75% 32%));
+    position: relative;
+    overflow: hidden;
+  }
+
+  .thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .thumb::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 30% 20%, rgba(255,255,255,.25), transparent 60%);
+  }
+
+  /* Info area */
+  .info { padding: 14px 15px 16px; }
+
+  .info h3 {
+    font-size: 1.02rem;
+    font-weight: 700;
+    margin-bottom: 5px;
+  }
+
+  .info p {
+    font-size: .82rem;
+    color: var(--muted);
+    line-height: 1.45;
+    min-height: 2.3em;
+  }
+
+  .play {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 12px;
+    font-size: .82rem;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    padding: 7px 15px;
+    border-radius: 999px;
+    transition: filter .2s;
+  }
+
+  .card:hover .play { filter: brightness(1.18); }
+
+  /* Tag badge */
+  .tag {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    z-index: 2;
+    font-size: .68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .6px;
+    padding: 5px 10px;
+    border-radius: 999px;
+    background: rgba(0,0,0,.55);
+    border: 1px solid rgba(255,255,255,.18);
+    backdrop-filter: blur(6px);
+  }
+
+  /* Empty state */
+  .empty {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--muted);
+  }
+  .empty span { font-size: 2.6rem; display: block; margin-bottom: 12px; }
+
+  /* ============ FOOTER ============ */
+  footer {
+    text-align: center;
+    padding: 26px 20px 40px;
+    color: var(--muted);
+    font-size: .82rem;
+    border-top: 1px solid rgba(255,255,255,.06);
+  }
+
+  @media (max-width: 560px) {
+    .grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; }
+    .thumb { font-size: 2.4rem; }
+    .info h3 { font-size: .92rem; }
+    .hero { padding-top: 32px; }
+  }
+</style>
+</head>
+
+<body>
+
+  <!-- ================= HEADER ================= -->
+  <header>
+    <div class="header-inner">
+      <div class="logo">🎮 <span>Game Wizard 🪄</span></div>
+
+      <div class="search-wrap">
+        <input type="text" id="search" placeholder="Search games..." autocomplete="off" />
+      </div>
+    </div>
+  </header>
+
+  <!-- ================= HERO ================= -->
+  <section class="hero">
+    <h1>Pick a game and <em>start playing</em></h1>
+    <p>All my games in one place — click any card to play instantly.</p>
+  </section>
+
+  <!-- ================= GAME GRID ================= -->
+  <main class="grid" id="gameGrid"></main>
+
+  <!-- ================= FOOTER ================= -->
+  <footer>
+    © <span id="year"></span> Wizard 🪄 build 
+  </footer>
+
+<script>
+/* =========================================================================
+   👇👇👇  ADD YOUR GAMES HERE  👇👇👇
+   -------------------------------------------------------------------------
+   Every game is one { ... } block. To add a new game:
+     1. Copy a block below.
+     2. Paste it right after the last one (remember the comma!).
+     3. Change the values.
+
+   FIELDS:
+     title  → the game name shown on the card
+     desc   → a short description
+     link   → the file/URL to open  (e.g. "floppy.html" or "games/snake.html")
+     image  → optional image path   (e.g. "images/floppy.png")
+              leave it as "" and it will use the emoji instead
+     emoji  → the icon shown if there is no image
+     tag    → small badge label (optional, can be "")
+   ========================================================================= */
+
+const games = [
+
+  /* ---------- EXAMPLE GAME 1 (your floppy.html file) ---------- */
+  {
+    title: "Flappy Friends",
+    desc:  "Tap to flap and dodge the pipes. How far can you go?",
+    link:  "floppy.html",        // ← your game file
+    image: "",                   // ← e.g. "images/flappy.png"
+    emoji: "🐦",
+    tag:   "Arcade"
+  },
+
+  /* ---------- EXAMPLE GAME 2 ---------- */
+  {
+    title: "Rail_rush",
+    desc:  "Run with rail rusher",
+    link:  "https://ezazkhan12.github.io/Rail_rush/",         // ← change to your file
+    image: "",
+    emoji: "🚂",
+    tag:   "Arcade"
+  },
+
+  /* ---------- EXAMPLE GAME 3 ---------- */
+  {
+    title: "",
+    desc:  "No game added yet",
+    link:  "",
+    image: "",
+    emoji: "",
+    tag:   ""
+  },
+
+  /* ---------- EXAMPLE GAME 4 ---------- */
+  {
+    title: "",
+    desc:  "No game added yet",
+    link:  "",
+    image: "",
+    emoji: "",
+    tag:   ""
+  },
+
+  /* ---------- 👇 PASTE YOUR NEXT GAME BLOCK HERE 👇 ---------- */
+
+  // {
+  //   title: "My New Game",
+  //   desc:  "Short description of the game.",
+  //   link:  "mygame.html",
+  //   image: "",
+  //   emoji: "🎯",
+  //   tag:   "Action"
+  // },
+
+];
+
+/* =========================================================================
+   ⚠️ You normally don't need to edit anything below this line.
+   ========================================================================= */
+
+const grid     = document.getElementById("gameGrid");
+const searchIn = document.getElementById("search");
+
+/* Build one card */
+function createCard(game, index) {
+  const card = document.createElement("a");
+  card.className = "card";
+  card.href = game.link || "#";
+
+  // Rotate the thumbnail hue so each card looks different
+  card.style.setProperty("--h", (index * 57) % 360);
+
+  const thumbContent = game.image
+    ? `<img src="${game.image}" alt="${game.title}" loading="lazy" />`
+    : `<span>${game.emoji || "🎮"}</span>`;
+
+  card.innerHTML = `
+    ${game.tag ? `<span class="tag">${game.tag}</span>` : ""}
+    <div class="thumb">${thumbContent}</div>
+    <div class="info">
+      <h3>${game.title}</h3>
+      <p>${game.desc || ""}</p>
+      <span class="play">▶ Play</span>
+    </div>
+  `;
+
+  return card;
+}
+
+/* Draw the grid (optionally filtered) */
+function renderGames(list) {
+  grid.innerHTML = "";
+
+  if (!list.length) {
+    grid.innerHTML = `
+      <div class="empty">
+        <span>🔎</span>
+        No games found. Try a different search.
+      </div>`;
+    return;
+  }
+
+  list.forEach((game, i) => grid.appendChild(createCard(game, i)));
+}
+
+/* Search filter */
+searchIn.addEventListener("input", () => {
+  const q = searchIn.value.trim().toLowerCase();
+  if (!q) return renderGames(games);
+
+  const filtered = games.filter(g =>
+    (g.title || "").toLowerCase().includes(q) ||
+    (g.desc  || "").toLowerCase().includes(q) ||
+    (g.tag   || "").toLowerCase().includes(q)
+  );
+
+  renderGames(filtered);
+});
+
+/* Init */
+renderGames(games);
+document.getElementById("year").textContent = new Date().getFullYear();
+</script>
+
+</body>
+</html>
