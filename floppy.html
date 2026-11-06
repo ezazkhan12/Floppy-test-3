@@ -167,6 +167,7 @@ async function login() {
 $("enter").onclick = login;
 $("phone").addEventListener("keydown", e => e.key === "Enter" && login());
 $("play").onclick = () => {
+  music.play();
   $("welcome").classList.add("hidden");
   $("gameWrap").classList.remove("hidden");
   $("hud").classList.remove("hidden");
@@ -179,7 +180,12 @@ const cv = $("c"), ctx = cv.getContext("2d");
 const W = 400, H = 600, R = 22, GAP = 160, PIPE_W = 64, SPEED = 2.6, GROUND = 40;
 let bird, pipes, score, state, frame, last, overAt = 0, looping = false;
 
+  const music = new Audio("song.mp3");   // change to your file name
+music.loop = true;                     // repeats the song
+music.volume = 0.5;                    // 0 = silent, 1 = full
+
 function reset() {
+  music.play();
   bird = { x: 100, y: H / 2, v: 0 };
   pipes = []; score = 0; frame = 0; state = "ready"; last = 0;
   $("hScore").textContent = 0;
@@ -191,6 +197,7 @@ function flap() {
 }
 function die() {
   state = "over"; overAt = Date.now();
+  music.pause(); music.currentTime = 0;
   if (score > best) {
     best = score;
     localStorage.setItem(localKey(), best);
